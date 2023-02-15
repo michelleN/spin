@@ -184,6 +184,10 @@ where
         }
     }
 
+    // spin up without --bindle/--oci ... then it streams to stdout AND logs to APP_DIR/.spin/logs
+    // spin up --bindle/--oci ... print to stdout, do not save to log file
+    // spin up both local/remote scenarios and use --log
+
     pub fn follow_components(&self) -> FollowComponents {
         if self.follow_all_components {
             eprintln!("NOTE: --follow-all has been deprecated. All component ouput is now printed to stdout by default.")

@@ -56,14 +56,18 @@ impl StdioLoggingTriggerHooks {
         log_suffix: &str,
     ) -> Result<ComponentStdioWriter> {
         let sanitized_component_id = sanitize_filename::sanitize(component_id);
-        let log_path = self
-            .log_dir
-            .as_deref()
-            .expect("log_dir should have been initialized in app_loaded")
-            .join(format!("{sanitized_component_id}_{log_suffix}.txt"));
         let follow = self.follow_components.should_follow(component_id);
-        ComponentStdioWriter::new(&log_path, follow)
-            .with_context(|| format!("Failed to open log file {log_path:?}"))
+
+        if let Some(log_dir) = self.log_dir {
+            let log_path = log_dir
+                .as_deref()
+                .expect("log_dir should have been initialized in app_loaded")
+                .join(format!("{sanitized_component_id}_{log_suffix}.txt"));
+            ComponentStdioWriter::new(Some(&log_path), follow)
+                .with_context(|| format!("Failed to open log file {log_path:?}"))
+        } else {
+            ComponentStdioWriter::new(None, follow)
+        }
     }
 
     fn validate_follows(&self, app: &spin_app::App) -> anyhow::Result<()> {
@@ -92,18 +96,21 @@ impl TriggerHooks for StdioLoggingTriggerHooks {
 
         self.validate_follows(app)?;
 
-        // Set default log_dir (if not explicitly passed)
-        let log_dir = self.log_dir.get_or_insert_with(|| {
-            let parent_dir = match dirs::home_dir() {
-                Some(home) => home.join(SPIN_HOME),
-                None => PathBuf::new(), // "./"
-            };
-            let sanitized_app = sanitize_filename::sanitize(app_name);
-            parent_dir.join(sanitized_app).join("logs")
-        });
-        // Ensure log dir exists
-        std::fs::create_dir_all(&log_dir)
-            .with_context(|| format!("Failed to create log dir {log_dir:?}"))?;
+        // Ensure log_dir exists if passed
+        if let Some(log_dir) = self.log_dir {
+            log_dir.get_or_insert_with(|| {
+                let parent_dir = match dirs::home_dir() {
+                    Some(home) => home.join(SPIN_HOME),
+                    None => PathBuf::new(), // "./"
+                };
+                let sanitized_app = sanitize_filename::sanitize(app_name);
+                parent_dir.join(sanitized_app).join("logs")
+            });
+
+            std::fs::create_dir_all(&log_dir)
+                .with_context(|| format!("Failed to create log dir {log_dir:?}"))?;
+        }
+
         Ok(())
     }
 
@@ -111,31 +118,55 @@ impl TriggerHooks for StdioLoggingTriggerHooks {
         &self,
         component: spin_app::AppComponent,
         builder: &mut spin_core::StoreBuilder,
+        log_file: Option<PathBuf>,
     ) -> anyhow::Result<()> {
         builder.stdout_pipe(self.component_stdio_writer(component.id(), "stdout")?);
         builder.stderr_pipe(self.component_stdio_writer(component.id(), "stderr")?);
+
+        // builder.inherit_stdout();
+        // builder.inherit_stderr();
+
         Ok(())
     }
 }
 
-/// ComponentStdioWriter forwards output to a log file and (optionally) stderr
+/// ComponentStdioWriter specifies where to forward output
+///     Output can be forwarded to a log file and/or stdout
 pub struct ComponentStdioWriter {
-    log_file: File,
+    log_file: Option<File>,
     follow: bool,
 }
 
 impl ComponentStdioWriter {
-    pub fn new(log_path: &Path, follow: bool) -> anyhow::Result<Self> {
-        let log_file = File::options().create(true).append(true).open(log_path)?;
-        Ok(Self { log_file, follow })
+    pub fn new(log_path: Option<&Path>, follow: bool) -> anyhow::Result<Self> {
+        match log_path {
+            Some(p) => {
+                let log_file = File::options().create(true).append(true).open(p)?;
+                Ok(Self {
+                    log_file: Some(log_file),
+                    follow,
+                })
+            }
+            None => Ok(Self {
+                log_file: None,
+                follow,
+            }),
+        }
     }
 }
 
 impl std::io::Write for ComponentStdioWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let written = self.log_file.write(buf)?;
+        let mut written: usize;
+        if self.log_file {
+            written = self.log_file.write(buf)?;
+
+            if self.follow {
+                std::io::stderr().write_all(&buf[..written])?;
+            }
+        }
         if self.follow {
-            std::io::stderr().write_all(&buf[..written])?;
+            written = std::io::stderr().write_all(buf)?;
         }
         Ok(written)
     }

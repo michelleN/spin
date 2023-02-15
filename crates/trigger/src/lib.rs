@@ -267,7 +267,7 @@ impl<Executor: TriggerExecutor> TriggerAppEngine<Executor> {
         let mut builder = self.engine.store_builder();
         let component = self.get_component(component_id)?;
         self.hooks
-            .component_store_builder(component, &mut builder)?;
+            .component_store_builder(component, &mut builder, None)?;
         Ok(builder)
     }
 
@@ -337,6 +337,7 @@ pub trait TriggerHooks: Send + Sync {
         &self,
         component: AppComponent,
         store_builder: &mut StoreBuilder,
+        log_file: Option<PathBuf>,
     ) -> Result<()> {
         Ok(())
     }
