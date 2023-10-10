@@ -60,7 +60,7 @@ impl StdioLoggingTriggerHooks {
         let sanitized_component_id = sanitize_filename::sanitize(component_id);
         let log_path = log_dir.join(format!("{sanitized_component_id}_{log_suffix}.txt"));
         let follow = self.follow_components.should_follow(component_id);
-        ComponentStdioWriter::new(&log_path, follow)
+        ComponentStdioWriter::new(&log_path, follow, component_id.to_owned())
             .with_context(|| format!("Failed to open log file {log_path:?}"))
     }
 
@@ -131,6 +131,7 @@ pub struct ComponentStdioWriter {
     async_file: tokio::fs::File,
     state: ComponentStdioWriterState,
     follow: bool,
+    component_id: String,
 }
 
 #[derive(Debug)]
@@ -140,7 +141,7 @@ enum ComponentStdioWriterState {
 }
 
 impl ComponentStdioWriter {
-    pub fn new(log_path: &Path, follow: bool) -> anyhow::Result<Self> {
+    pub fn new(log_path: &Path, follow: bool, component_id: String) -> anyhow::Result<Self> {
         let sync_file = std::fs::File::options()
             .create(true)
             .append(true)
@@ -154,6 +155,7 @@ impl ComponentStdioWriter {
             sync_file,
             state: ComponentStdioWriterState::File,
             follow,
+            component_id,
         })
     }
 }
@@ -165,11 +167,16 @@ impl AsyncWrite for ComponentStdioWriter {
         buf: &[u8],
     ) -> Poll<std::result::Result<usize, std::io::Error>> {
         let this = self.get_mut();
+
+        let mut prefixed = format!("[{}] ", this.component_id).as_bytes().to_vec();
+        prefixed.extend_from_slice(buf);
+        let prefixed_buf = prefixed.as_slice();
+
         loop {
             match &this.state {
                 ComponentStdioWriterState::File => {
                     let written = futures::ready!(
-                        std::pin::Pin::new(&mut this.async_file).poll_write(cx, buf)
+                        std::pin::Pin::new(&mut this.async_file).poll_write(cx, prefixed_buf)
                     );
                     let written = match written {
                         Ok(e) => e,
@@ -183,15 +190,14 @@ impl AsyncWrite for ComponentStdioWriter {
                 }
                 ComponentStdioWriterState::Follow(range) => {
                     let written = futures::ready!(std::pin::Pin::new(&mut tokio::io::stderr())
-                        .poll_write(cx, &buf[range.clone()]));
+                        .poll_write(cx, &prefixed_buf[range.clone()]));
                     let written = match written {
                         Ok(e) => e,
                         Err(e) => return Poll::Ready(Err(e)),
                     };
                     if range.start + written >= range.end {
-                        let end = range.end;
                         this.state = ComponentStdioWriterState::File;
-                        return Poll::Ready(Ok(end));
+                        return Poll::Ready(Ok(buf.len()));
                     } else {
                         this.state =
                             ComponentStdioWriterState::Follow((range.start + written)..range.end);
