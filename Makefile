@@ -45,6 +45,17 @@ endif
 build:
 	cargo build --release
 
+.PHONY: clean
+clean:
+	@for lockfile in $$(\
+		find . -regex './tests/.*/Cargo.lock' && \
+		find . -regex './crates/.*/Cargo.lock' && \
+		find . -regex './examples/.*/Cargo.lock' \
+	); do \
+		rm $$lockfile ; \
+	done
+
+
 .PHONY: install
 install:
 	cargo install --path . --locked

@@ -175,6 +175,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "http",
+ "log",
  "spin-sdk",
 ]
 

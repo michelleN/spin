@@ -1,6 +1,7 @@
 package fermyon:spin@2.0.0
 
 world host {
+  import wasi:logging/logging
   include fermyon:spin/host
   
   import sqlite
@@ -18,6 +19,7 @@ world http-trigger {
 }
 
 world platform {
+  import wasi:logging/logging
   import fermyon:spin/config
   import fermyon:spin/http
   import fermyon:spin/postgres

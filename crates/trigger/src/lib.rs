@@ -102,7 +102,7 @@ impl<Executor: TriggerExecutor> TriggerExecutorBuilder<Executor> {
     pub async fn build(
         mut self,
         app_uri: String,
-        runtime_config: runtime_config::RuntimeConfig,
+        runtime_config: runtime_config::RuntimeConfig, // TODO
         init_data: HostComponentInitData,
     ) -> Result<Executor>
     where
@@ -115,6 +115,7 @@ impl<Executor: TriggerExecutor> TriggerExecutorBuilder<Executor> {
                 builder.add_host_component(outbound_redis::OutboundRedisComponent)?;
                 builder.add_host_component(outbound_pg::OutboundPg::default())?;
                 builder.add_host_component(outbound_mysql::OutboundMysql::default())?;
+                builder.add_host_component(logging::LoggingComponent::default())?;
                 self.loader.add_dynamic_host_component(
                     &mut builder,
                     runtime_config::llm::build_component(&runtime_config, init_data.llm.use_gpu)
