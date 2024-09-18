@@ -225,6 +225,9 @@ pub struct LockedComponent {
     /// Component dependencies
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub dependencies: BTreeMap<DependencyName, LockedComponentDependency>,
+    /// Component Labels
+    #[serde(default, skip_serializing_if = "LockedMap::is_empty")]
+    pub labels: LockedMap<String>,
 }
 
 /// A LockedDependency represents a "fully resolved" Spin component dependency.

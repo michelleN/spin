@@ -406,6 +406,14 @@ impl<F: RuntimeFactors> HttpServer<F> {
                 if let Some(description) = component.get_metadata(APP_DESCRIPTION_KEY)? {
                     println!("    {}", description);
                 }
+                print!("    {} labels:", component.id());
+                for (index, (key, value)) in component.labels().into_iter().enumerate() {
+                    if index > 0 {
+                        print!(",");
+                    }
+                    print!(" {}={}", key, value);
+                }
+                println!();
             }
         }
         Ok(())

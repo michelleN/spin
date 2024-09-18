@@ -189,6 +189,14 @@ impl<'a> AppComponent<'a> {
             .map(|(k, v)| (k.as_str(), v.as_str()))
     }
 
+    /// Returns an iterator of labels (key, value) pairs.
+    pub fn labels(&self) -> impl IntoIterator<Item = (&str, &str)> {
+        self.locked
+            .labels
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+
     /// Returns an iterator of [`ContentPath`]s for this component's configured
     /// "directory mounts".
     pub fn files(&self) -> std::slice::Iter<ContentPath> {

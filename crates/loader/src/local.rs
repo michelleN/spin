@@ -173,6 +173,7 @@ impl LocalLoader {
             .await?;
 
         let env = component.environment.into_iter().collect();
+        let labels = component.labels.into_iter().collect();
 
         let files = if component.files.is_empty() {
             vec![]
@@ -221,6 +222,7 @@ impl LocalLoader {
             files,
             config,
             dependencies,
+            labels,
         })
     }
 

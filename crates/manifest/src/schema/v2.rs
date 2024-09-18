@@ -193,6 +193,9 @@ pub struct Component {
     /// Component dependencies
     #[serde(default, skip_serializing_if = "ComponentDependencies::is_empty")]
     pub dependencies: ComponentDependencies,
+    /// Component labels `labels = { key = "value" }`
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub labels: Map<String, String>,
 }
 
 /// Component dependencies
